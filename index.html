@@ -384,7 +384,9 @@
       els.alertBtn.textContent = '🔔 Alertas push activadas';
       showToast('Alertas push activadas. El servidor revisa señales cada 10 min y te avisa aunque cierres la app.');
     } else {
-      showToast('No se pudo registrar la suscripción en el servidor. Intenta de nuevo.');
+      const errText = await res.text();
+      showToast(`Error ${res.status}: ${errText.slice(0,200)}`);
+      console.error('subscribe failed', res.status, errText);
     }
   }
 
