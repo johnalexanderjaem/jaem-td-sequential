@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>JAEM · TD Sequential</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0A0E13">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<style>
+  :root{
+    --bg:#0A0E13;
+    --panel:#11161D;
+    --panel-2:#161C24;
+    --line:#232B35;
+    --text:#E7ECF1;
+    --muted:#6E7A87;
+    --buy:#33D17A;
+    --buy-dim:#1B4A33;
+    --sell:#FF5C5C;
+    --sell-dim:#4A1F22;
+    --amber:#E8B84B;
+    --mono: 'SFMono-Regular', Consolas, 'Roboto Mono', Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--text); font-family:var(--sans);}
+  body{ min-height:100vh; padding:18px 16px 40px; max-width:520px; margin:0 auto; }
+  @media (prefers-reduced-motion: reduce){ *{animation:none !important; transition:none !important;} }
+
+  header{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:18px;}
+  .brand{font-size:15px; letter-spacing:.02em; color:var(--muted);}
+  .brand b{color:var(--text); font-weight:600;}
+  .clock{font-family:var(--mono); font-size:12px; color:var(--muted);}
+
+  .symbol-row{display:flex; gap:8px; margin-bottom:12px;}
+  .symbol-btn{ flex:1; padding:9px 0; text-align:center; border-radius:9px; border:1px solid var(--line); background:var(--panel); color:var(--muted); font-size:13px; font-weight:600; cursor:pointer; }
+  .symbol-btn.active{ color:var(--bg); background:var(--text); border-color:var(--text); }
+
+  .price-panel{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 20px 18px; margin-bottom:12px; }
+  .price-label{font-size:12px; color:var(--muted); margin-bottom:4px;}
+  .price-value{font-family:var(--mono); font-size:34px; font-weight:600; letter-spacing:-.01em;}
+  .price-change{font-family:var(--mono); font-size:13px; margin-top:4px;}
+  .price-change.up{color:var(--buy);}
+  .price-change.down{color:var(--sell);}
+
+  .tf-row{display:flex; gap:6px; margin-bottom:12px;}
+  .tf-btn{ flex:1; padding:8px 0; text-align:center; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--muted); font-size:12px; font-weight:600; cursor:pointer; }
+  .tf-btn.active{ background:var(--panel-2); color:var(--amber); border-color:var(--amber); }
+
+  .signal-panel{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px 20px; margin-bottom:12px; display:flex; align-items:center; gap:18px; }
+  .signal-panel.buy{ border-color: var(--buy); background: linear-gradient(180deg, var(--buy-dim), var(--panel) 70%); }
+  .signal-panel.sell{ border-color: var(--sell); background: linear-gradient(180deg, var(--sell-dim), var(--panel) 70%); }
+
+  .count-number{ font-family:var(--mono); font-size:52px; font-weight:700; min-width:74px; text-align:center; color:var(--muted); }
+  .count-number.buy{ color:var(--buy); }
+  .count-number.sell{ color:var(--sell); }
+
+  .signal-copy .signal-title{ font-size:15px; font-weight:700; margin-bottom:3px; }
+  .signal-copy .signal-title.buy{ color:var(--buy); }
+  .signal-copy .signal-title.sell{ color:var(--sell); }
+  .signal-copy .signal-desc{ font-size:12.5px; color:var(--muted); line-height:1.4; }
+
+  .info-panel{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-bottom:12px; font-size:12.5px; color:var(--muted); line-height:1.5; }
+  .info-panel b{color:var(--text);}
+
+  .alert-btn{ width:100%; padding:13px 0; border-radius:10px; border:1px solid var(--line); background:var(--panel-2); color:var(--text); font-size:14px; font-weight:600; cursor:pointer; margin-bottom:10px; }
+  .alert-btn.on{ border-color:var(--buy); color:var(--buy); }
+  .alert-note{ font-size:11.5px; color:var(--muted); text-align:center; margin:-4px 0 14px; }
+
+  .log-title{ font-size:11px; letter-spacing:.04em; color:var(--muted); margin:18px 0 8px; }
+  .log-item{ display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:1px solid var(--line); border-radius:9px; background:var(--panel); margin-bottom:6px; font-size:12.5px; }
+  .log-item .tag{ font-family:var(--mono); font-weight:700; }
+  .log-item .tag.buy{ color:var(--buy); }
+  .log-item .tag.sell{ color:var(--sell); }
+  .log-item .time{ color:var(--muted); font-family:var(--mono); font-size:11.5px; }
+  .log-empty{ font-size:12.5px; color:var(--muted); padding:10px 2px; }
+
+  .status-line{ font-size:11px; color:var(--muted); text-align:center; margin-top:16px; font-family:var(--mono); }
+  .status-line.err{ color:var(--sell); }
+
+  .toast{ position:fixed; left:16px; right:16px; bottom:18px; max-width:488px; margin:0 auto; background:var(--panel-2); border:1px solid var(--amber); border-radius:12px; padding:14px 16px; font-size:13px; opacity:0; transform:translateY(12px); transition:opacity .25s ease, transform .25s ease; pointer-events:none; }
+  .toast.show{ opacity:1; transform:translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><b>JAEM</b> · TD Sequential</div>
+  <div class="clock" id="clock">--:--:--</div>
+</header>
+
+<div class="symbol-row">
+  <div class="symbol-btn active" data-symbol="BTCUSDT">BTC/USDT</div>
+  <div class="symbol-btn" data-symbol="ETHUSDT">ETH/USDT</div>
+</div>
+
+<div class="price-panel">
+  <div class="price-label" id="priceLabel">Precio actual</div>
+  <div class="price-value" id="priceValue">—</div>
+  <div class="price-change" id="priceChange"></div>
+</div>
+
+<div class="tf-row">
+  <div class="tf-btn" data-tf="1h">1H</div>
+  <div class="tf-btn" data-tf="4h">4H</div>
+  <div class="tf-btn active" data-tf="1d">1D</div>
+  <div class="tf-btn" data-tf="1w">1W</div>
+  <div class="tf-btn" data-tf="1M">1M</div>
+</div>
+
+<div class="signal-panel" id="signalPanel">
+  <div class="count-number" id="countNumber">—</div>
+  <div class="signal-copy">
+    <div class="signal-title" id="signalTitle">Sin señal</div>
+    <div class="signal-desc" id="signalDesc">Contando velas. La cuenta llega a 9 para confirmar un setup TD Sequential.</div>
+  </div>
+</div>
+
+<div class="info-panel">
+  <div style="margin-bottom:8px;"><b>▲ 9 — Señal de COMPRA</b><br>Posible soporte alcista tras una tendencia bajista.</div>
+  <div><b>▼ 9 — Señal de VENTA</b><br>Posible resistencia bajista tras una tendencia alcista.</div>
+</div>
+
+<button class="alert-btn" id="alertBtn">🔔 Activar alertas push (BTC + ETH · 1H/4H/1D)</button>
+<div class="alert-note">Las alertas push llegan aunque cierres la app, revisadas cada 10 min desde el servidor.</div>
+
+<div class="log-title">HISTORIAL DE SEÑALES (esta sesión)</div>
+<div id="logList"><div class="log-empty">Aún no hay señales registradas en esta sesión.</div></div>
+
+<div class="status-line" id="statusLine">cargando…</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ⚠️ Reemplaza esta clave por tu VAPID_PUBLIC_KEY (la misma que pongas como
+  // variable de entorno en Netlify). Es pública, no pasa nada si queda en el código.
+  const VAPID_PUBLIC_KEY = 'BG0TN9u45Xvtq1qmN1wSoI2AaY5DDLPeDUzrXQ6ahMeRRG-4x374E7okShHA22Rt9qwgCWjvNcBFNrq8eaduGqc';
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+  }
+
+(function(){
+  const state = {
+    symbol: 'BTCUSDT',
+    tf: '1d',
+    closes: [],
+    lastPrice: null,
+    prevClosePrice: null,
+    lastSignalBarTime: null,
+    pushEnabled: false,
+    pollTimer: null,
+    log: []
+  };
+
+  const els = {
+    priceValue: document.getElementById('priceValue'),
+    priceLabel: document.getElementById('priceLabel'),
+    priceChange: document.getElementById('priceChange'),
+    countNumber: document.getElementById('countNumber'),
+    signalPanel: document.getElementById('signalPanel'),
+    signalTitle: document.getElementById('signalTitle'),
+    signalDesc: document.getElementById('signalDesc'),
+    statusLine: document.getElementById('statusLine'),
+    clock: document.getElementById('clock'),
+    alertBtn: document.getElementById('alertBtn'),
+    logList: document.getElementById('logList'),
+    toast: document.getElementById('toast')
+  };
+
+  const POLL_MS = { '1h': 45000, '4h': 90000, '1d': 5*60000, '1w': 15*60000, '1M': 30*60000 };
+  const TF_LABEL = { '1h':'1H', '4h':'4H', '1d':'1D', '1w':'1W', '1M':'1M' };
+
+  function fmtClock(){ document.getElementById('clock').textContent = new Date().toLocaleTimeString('es-CO', {hour12:false}); }
+  setInterval(fmtClock, 1000); fmtClock();
+
+  function fmtPrice(p){ return p == null ? '—' : '$' + p.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+  function showToast(msg){
+    els.toast.textContent = msg;
+    els.toast.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(()=> els.toast.classList.remove('show'), 4500);
+  }
+
+  function computeTD(closes){
+    let buyCount = 0, sellCount = 0;
+    const out = [];
+    for(let i=0; i<closes.length; i++){
+      let signal = null;
+      if(i >= 4){
+        if(closes[i] < closes[i-4]){ buyCount += 1; sellCount = 0; }
+        else if(closes[i] > closes[i-4]){ sellCount += 1; buyCount = 0; }
+        else { buyCount = 0; sellCount = 0; }
+        if(buyCount === 9){ signal = 'BUY'; buyCount = 0; }
+        if(sellCount === 9){ signal = 'SELL'; sellCount = 0; }
+      }
+      out.push({ index:i, buyCount, sellCount, signal });
+    }
+    return out;
+  }
+
+  async function fetchKlines(symbol, interval, limit){
+    const url = `https://data-api.binance.vision/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    return data.map(k => ({ openTime: k[0], close: parseFloat(k[4]), closeTime: k[6] }));
+  }
+
+  function renderSignal(td, candles){
+    const last = td[td.length - 1];
+    els.signalPanel.classList.remove('buy','sell');
+    els.countNumber.classList.remove('buy','sell');
+    els.signalTitle.classList.remove('buy','sell');
+
+    let activeCount = 0, direction = null;
+    if(last.buyCount > 0){ activeCount = last.buyCount; direction = 'buy'; }
+    else if(last.sellCount > 0){ activeCount = last.sellCount; direction = 'sell'; }
+    if(last.signal){ direction = last.signal === 'BUY' ? 'buy' : 'sell'; activeCount = 9; }
+
+    if(direction){ els.signalPanel.classList.add(direction); els.countNumber.classList.add(direction); }
+    els.countNumber.textContent = activeCount > 0 ? activeCount : '—';
+
+    if(last.signal === 'BUY'){
+      els.signalTitle.classList.add('buy');
+      els.signalTitle.textContent = '▲ 9 Señal de COMPRA';
+      els.signalDesc.textContent = 'Posible soporte alcista confirmado. El precio podría rebotar al alza.';
+    } else if(last.signal === 'SELL'){
+      els.signalTitle.classList.add('sell');
+      els.signalTitle.textContent = '▼ 9 Señal de VENTA';
+      els.signalDesc.textContent = 'Posible resistencia bajista confirmada. El precio podría corregir a la baja.';
+    } else if(direction === 'buy'){
+      els.signalTitle.textContent = `Contando setup de COMPRA (${activeCount}/9)`;
+      els.signalDesc.textContent = 'Cierres consecutivos por debajo del cierre de 4 velas atrás.';
+    } else if(direction === 'sell'){
+      els.signalTitle.textContent = `Contando setup de VENTA (${activeCount}/9)`;
+      els.signalDesc.textContent = 'Cierres consecutivos por encima del cierre de 4 velas atrás.';
+    } else {
+      els.signalTitle.textContent = 'Sin señal';
+      els.signalDesc.textContent = 'Contando velas. La cuenta llega a 9 para confirmar un setup TD Sequential.';
+    }
+
+    if(last.signal && candles.length){
+      const barTime = candles[candles.length - 1].closeTime;
+      const dedupeKey = state.symbol + '_' + state.tf + '_' + barTime;
+      if(state.lastSignalBarTime !== dedupeKey){
+        state.lastSignalBarTime = dedupeKey;
+        logLocalSignal(last.signal, state.symbol, state.tf);
+      }
+    }
+  }
+
+  function logLocalSignal(signal, symbol, tf){
+    const label = symbol.replace('USDT','/USDT');
+    const isBuy = signal === 'BUY';
+    state.log.unshift({ signal, symbol: label, tf: TF_LABEL[tf], time: new Date() });
+    state.log = state.log.slice(0, 20);
+    renderLog();
+    showToast(`🔔 ${isBuy ? '▲' : '▼'} ${isBuy ? 'COMPRA' : 'VENTA'} 9 en ${label} · ${TF_LABEL[tf]}`);
+    if(navigator.vibrate) navigator.vibrate(isBuy ? [80,40,80] : [180]);
+  }
+
+  function renderLog(){
+    if(!state.log.length){
+      els.logList.innerHTML = '<div class="log-empty">Aún no hay señales registradas en esta sesión.</div>';
+      return;
+    }
+    els.logList.innerHTML = state.log.map(item => {
+      const isBuy = item.signal === 'BUY';
+      const timeStr = item.time.toLocaleTimeString('es-CO', {hour12:false});
+      return `<div class="log-item">
+        <span class="tag ${isBuy?'buy':'sell'}">${isBuy?'▲ COMPRA':'▼ VENTA'} · ${item.symbol} ${item.tf}</span>
+        <span class="time">${timeStr}</span>
+      </div>`;
+    }).join('');
+  }
+
+  async function refresh(){
+    try{
+      els.statusLine.classList.remove('err');
+      els.statusLine.textContent = 'actualizando…';
+      const candles = await fetchKlines(state.symbol, state.tf, 120);
+      const closes = candles.map(c => c.close);
+      state.closes = closes;
+
+      const lastClose = closes[closes.length - 1];
+      const prevClose = closes[closes.length - 2];
+      state.prevClosePrice = prevClose;
+      state.lastPrice = lastClose;
+
+      els.priceLabel.textContent = state.symbol === 'BTCUSDT' ? 'Bitcoin (BTC/USDT)' : 'Ethereum (ETH/USDT)';
+      els.priceValue.textContent = fmtPrice(lastClose);
+      if(prevClose != null){
+        const pct = ((lastClose - prevClose) / prevClose) * 100;
+        els.priceChange.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(2) + '% última vela';
+        els.priceChange.classList.toggle('up', pct >= 0);
+        els.priceChange.classList.toggle('down', pct < 0);
+      }
+
+      const td = computeTD(closes);
+      renderSignal(td, candles);
+      els.statusLine.textContent = `${candles.length} velas · ${TF_LABEL[state.tf]} · actualizado ${new Date().toLocaleTimeString('es-CO',{hour12:false})}`;
+    }catch(err){
+      els.statusLine.classList.add('err');
+      els.statusLine.textContent = 'Error cargando datos — reintentando…';
+      console.error(err);
+    }
+  }
+
+  function schedulePoll(){
+    if(state.pollTimer) clearInterval(state.pollTimer);
+    state.pollTimer = setInterval(refresh, POLL_MS[state.tf] || 60000);
+  }
+
+  document.querySelectorAll('.symbol-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.symbol-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.symbol = btn.dataset.symbol;
+      state.lastSignalBarTime = null;
+      refresh();
+    });
+  });
+
+  document.querySelectorAll('.tf-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.tf = btn.dataset.tf;
+      state.lastSignalBarTime = null;
+      refresh();
+      schedulePoll();
+    });
+  });
+
+  // --- Push subscription ---
+  async function registerServiceWorker(){
+    if(!('serviceWorker' in navigator)) return null;
+    return navigator.serviceWorker.register('/sw.js');
+  }
+
+  async function subscribeToPush(){
+    if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+      showToast('Este navegador no soporta notificaciones push.');
+      return;
+    }
+    if(VAPID_PUBLIC_KEY.startsWith('REEMPLAZA')){
+      showToast('Falta configurar la VAPID_PUBLIC_KEY en el código antes de desplegar.');
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted'){
+      showToast('Permiso de notificaciones denegado.');
+      return;
+    }
+
+    const reg = await registerServiceWorker();
+    await navigator.serviceWorker.ready;
+
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub){
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+
+    const res = await fetch('/.netlify/functions/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sub)
+    });
+
+    if(res.ok){
+      state.pushEnabled = true;
+      els.alertBtn.classList.add('on');
+      els.alertBtn.textContent = '🔔 Alertas push activadas';
+      showToast('Alertas push activadas. El servidor revisa señales cada 10 min y te avisa aunque cierres la app.');
+    } else {
+      showToast('No se pudo registrar la suscripción en el servidor. Intenta de nuevo.');
+    }
+  }
+
+  els.alertBtn.addEventListener('click', subscribeToPush);
+
+  registerServiceWorker();
+  refresh();
+  schedulePoll();
+})();
+</script>
+</body>
+</html>

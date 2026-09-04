@@ -1,0 +1,8 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+# Revisa señales cada 10 minutos. Ajusta el cron si quieres más o menos frecuencia.
+# Sintaxis: minuto hora día-mes mes día-semana
+[functions."check-signals"]
+  schedule = "*/10 * * * *"
