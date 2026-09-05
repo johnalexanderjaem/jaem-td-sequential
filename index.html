@@ -65,6 +65,15 @@
   .info-panel{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-bottom:12px; font-size:12.5px; color:var(--muted); line-height:1.5; }
   .info-panel b{color:var(--text);}
 
+  .chart-panel{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 12px 10px; margin-bottom:12px; }
+  .chart-title{ font-size:11px; letter-spacing:.04em; color:var(--muted); margin-bottom:10px; }
+  #candleCanvas{ width:100%; height:220px; display:block; }
+  .chart-legend{ display:flex; gap:14px; margin-top:8px; font-size:10.5px; color:var(--muted); }
+  .chart-legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .chart-legend i{ width:8px; height:8px; border-radius:2px; display:inline-block; }
+  .chart-legend i.buy{ background:var(--buy); }
+  .chart-legend i.sell{ background:var(--sell); }
+
   .alert-btn{ width:100%; padding:13px 0; border-radius:10px; border:1px solid var(--line); background:var(--panel-2); color:var(--text); font-size:14px; font-weight:600; cursor:pointer; margin-bottom:10px; }
   .alert-btn.on{ border-color:var(--buy); color:var(--buy); }
   .alert-note{ font-size:11.5px; color:var(--muted); text-align:center; margin:-4px 0 14px; }
@@ -123,6 +132,15 @@
   <div><b>▼ 9 — Señal de VENTA</b><br>Posible resistencia bajista tras una tendencia alcista.</div>
 </div>
 
+<div class="chart-panel">
+  <div class="chart-title">GRÁFICO DE VELAS · CONTEO TD SEQUENTIAL</div>
+  <canvas id="candleCanvas"></canvas>
+  <div class="chart-legend">
+    <span><i class="sell"></i> Conteo de VENTA (arriba)</span>
+    <span><i class="buy"></i> Conteo de COMPRA (abajo)</span>
+  </div>
+</div>
+
 <button class="alert-btn" id="alertBtn">🔔 Activar alertas push (BTC + ETH · 1H/4H/1D)</button>
 <div class="alert-note">Las alertas push llegan aunque cierres la app, revisadas cada 10 min desde el servidor.</div>
 
@@ -150,6 +168,8 @@
     symbol: 'BTCUSDT',
     tf: '1d',
     closes: [],
+    lastCandles: [],
+    lastTd: [],
     lastPrice: null,
     prevClosePrice: null,
     lastSignalBarTime: null,
@@ -170,7 +190,8 @@
     clock: document.getElementById('clock'),
     alertBtn: document.getElementById('alertBtn'),
     logList: document.getElementById('logList'),
-    toast: document.getElementById('toast')
+    toast: document.getElementById('toast'),
+    candleCanvas: document.getElementById('candleCanvas')
   };
 
   const POLL_MS = { '1h': 45000, '4h': 90000, '1d': 5*60000, '1w': 15*60000, '1M': 30*60000 };
@@ -180,6 +201,8 @@
   setInterval(fmtClock, 1000); fmtClock();
 
   function fmtPrice(p){ return p == null ? '—' : '$' + p.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+  function getCssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
   function showToast(msg){
     els.toast.textContent = msg;
@@ -288,6 +311,87 @@
     }).join('');
   }
 
+  // --- Gráfico de velas con conteo TD Sequential ---
+  function drawCandleChart(candles, td){
+    const canvas = els.candleCanvas;
+    if(!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if(cssWidth === 0 || cssHeight === 0) return;
+    canvas.width = cssWidth * dpr;
+    canvas.height = cssHeight * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+    const MAX_CANDLES = 40;
+    const start = Math.max(0, candles.length - MAX_CANDLES);
+    const visCandles = candles.slice(start);
+    const visTd = td.slice(start);
+    if(!visCandles.length) return;
+
+    const padTop = 20, padBottom = 20, padLeft = 3, padRight = 3;
+    const chartH = cssHeight - padTop - padBottom;
+    const chartW = cssWidth - padLeft - padRight;
+
+    let minLow = Infinity, maxHigh = -Infinity;
+    visCandles.forEach(c => { if(c.low < minLow) minLow = c.low; if(c.high > maxHigh) maxHigh = c.high; });
+    const rangePad = (maxHigh - minLow) * 0.10 || 1;
+    minLow -= rangePad; maxHigh += rangePad;
+
+    const slotW = chartW / visCandles.length;
+    const bodyW = Math.max(2, Math.min(10, slotW * 0.55));
+
+    function yFor(price){
+      return padTop + (1 - (price - minLow) / (maxHigh - minLow)) * chartH;
+    }
+
+    const buyColor = getCssVar('--buy') || '#33D17A';
+    const sellColor = getCssVar('--sell') || '#FF5C5C';
+    const mutedColor = getCssVar('--muted') || '#6E7A87';
+
+    visCandles.forEach((c, i) => {
+      const x = padLeft + i * slotW + slotW / 2;
+      const isUp = c.close >= c.open;
+      const color = isUp ? buyColor : sellColor;
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, yFor(c.high));
+      ctx.lineTo(x, yFor(c.low));
+      ctx.stroke();
+
+      ctx.fillStyle = color;
+      const yOpen = yFor(c.open), yClose = yFor(c.close);
+      const top = Math.min(yOpen, yClose);
+      const h = Math.max(1, Math.abs(yClose - yOpen));
+      ctx.fillRect(x - bodyW / 2, top, bodyW, h);
+
+      const info = visTd[i];
+      let label = null, isBuyLabel = false, isFinal = false;
+      if(info.signal){ label = '9'; isBuyLabel = info.signal === 'BUY'; isFinal = true; }
+      else if(info.buyCount > 0){ label = String(info.buyCount); isBuyLabel = true; }
+      else if(info.sellCount > 0){ label = String(info.sellCount); isBuyLabel = false; }
+
+      if(label){
+        ctx.font = (isFinal ? '700 11px' : '500 9px') + ' ' + (getCssVar('--sans') || 'sans-serif');
+        ctx.fillStyle = isFinal ? (isBuyLabel ? buyColor : sellColor) : mutedColor;
+        ctx.textAlign = 'center';
+        if(isBuyLabel){
+          ctx.fillText(label, x, Math.min(cssHeight - 4, yFor(c.low) + 13));
+        } else {
+          ctx.fillText(label, x, Math.max(10, yFor(c.high) - 6));
+        }
+      }
+    });
+  }
+
+  window.addEventListener('resize', () => {
+    if(state.lastCandles.length) drawCandleChart(state.lastCandles, state.lastTd);
+  });
+
   async function refresh(){
     try{
       els.statusLine.classList.remove('err');
@@ -312,6 +416,11 @@
 
       const td = computeTD(closes);
       renderSignal(td, candles);
+
+      state.lastCandles = candles;
+      state.lastTd = td;
+      drawCandleChart(candles, td);
+
       els.statusLine.textContent = `${candles.length} velas · ${TF_LABEL[state.tf]} · actualizado ${new Date().toLocaleTimeString('es-CO',{hour12:false})}`;
     }catch(err){
       els.statusLine.classList.add('err');
