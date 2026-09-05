@@ -14,7 +14,11 @@ exports.handler = async (event) => {
       return { statusCode: 400, body: 'Suscripción inválida' };
     }
 
-    const store = getStore('push-subscriptions');
+    const store = getStore({
+  name: 'push-subscriptions',
+  siteID: process.env.NETLIFY_SITE_ID,
+  token: process.env.NETLIFY_API_TOKEN
+});
     const key = Buffer.from(subscription.endpoint).toString('base64').slice(0, 200);
     await store.setJSON(key, subscription);
 
