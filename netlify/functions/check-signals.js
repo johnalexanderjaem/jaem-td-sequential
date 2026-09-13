@@ -3,10 +3,10 @@
 // a todas las suscripciones guardadas cuando aparece una señal nueva.
 
 const webpush = require('web-push');
-const { getStore } = require('@netlify/blobs');
+const { getStore, connectLambda } = require('@netlify/blobs');
 
 const SYMBOLS = ['BTCUSDT', 'ETHUSDT'];
-const TIMEFRAMES = ['1h', '4h', '1d'];
+const TIMEFRAMES = ['1h', '4h', '1d']; // agrega '1w' / '1M' si quieres cubrir más plazos
 const TF_LABEL = { '1h': '1H', '4h': '4H', '1d': '1D', '1w': '1W', '1M': '1M' };
 
 webpush.setVapidDetails(
@@ -14,11 +14,6 @@ webpush.setVapidDetails(
   process.env.VAPID_PUBLIC_KEY,
   process.env.VAPID_PRIVATE_KEY
 );
-
-const BLOBS_CONFIG = {
-  siteID: process.env.NETLIFY_SITE_ID,
-  token: process.env.NETLIFY_API_TOKEN
-};
 
 function computeTD(closes) {
   let buyCount = 0, sellCount = 0;
@@ -55,9 +50,11 @@ async function getAllSubscriptions(subStore) {
   return subs;
 }
 
-exports.handler = async () => {
-  const stateStore = getStore({ name: 'signal-state', ...BLOBS_CONFIG });
-  const subStore = getStore({ name: 'push-subscriptions', ...BLOBS_CONFIG });
+exports.handler = async (event) => {
+  connectLambda(event);
+
+  const stateStore = getStore('signal-state');
+  const subStore = getStore('push-subscriptions');
 
   const subscriptions = await getAllSubscriptions(subStore);
   if (subscriptions.length === 0) {
@@ -80,7 +77,7 @@ exports.handler = async () => {
         const prevState = await stateStore.get(stateKey, { type: 'json' });
 
         if (prevState && prevState.lastBarTime === barTime) {
-          continue;
+          continue; // ya se avisó esta vela, evita duplicados
         }
 
         await stateStore.setJSON(stateKey, { lastBarTime: barTime, signal: last.signal });
@@ -99,6 +96,7 @@ exports.handler = async () => {
             await webpush.sendNotification(sub, payload);
           } catch (err) {
             if (err.statusCode === 404 || err.statusCode === 410) {
+              // suscripción caducada o inválida: la eliminamos
               await subStore.delete(key);
             } else {
               console.error('push send error', symbol, tf, err.message);
