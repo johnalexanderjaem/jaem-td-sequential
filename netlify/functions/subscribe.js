@@ -1,9 +1,11 @@
 // netlify/functions/subscribe.js
 // Recibe la suscripción push del navegador y la guarda en Netlify Blobs.
 
-const { getStore } = require('@netlify/blobs');
+const { getStore, connectLambda } = require('@netlify/blobs');
 
 exports.handler = async (event) => {
+  connectLambda(event);
+
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
@@ -14,11 +16,7 @@ exports.handler = async (event) => {
       return { statusCode: 400, body: 'Suscripción inválida' };
     }
 
-    const store = getStore({
-  name: 'push-subscriptions',
-  siteID: process.env.NETLIFY_SITE_ID,
-  token: process.env.NETLIFY_API_TOKEN
-});
+    const store = getStore('push-subscriptions');
     const key = Buffer.from(subscription.endpoint).toString('base64').slice(0, 200);
     await store.setJSON(key, subscription);
 
